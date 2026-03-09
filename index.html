@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AJAX Search Suggestion | Web Technologies</title>
+
+  <!--
+    ============================================================
+    PROJECT  : AJAX-Based Search Suggestion Feature
+    SUBJECT  : Web Technologies
+    USES     : HTML, CSS, JavaScript, jQuery, AJAX
+    AUTHOR   : [Your Name]
+    DATE     : 2026
+    ============================================================
+
+    HOW IT WORKS (Simple Explanation):
+    ─────────────────────────────────
+    1. User types in the search box.
+    2. JavaScript captures every key press.
+    3. AJAX sends the typed text to a server (simulated here).
+    4. Server returns matching suggestions.
+    5. jQuery displays them as a dropdown — instantly!
+
+    In a real project, step 3-4 would call a real backend URL.
+    Here we simulate it using a local JavaScript array.
+    ============================================================
+  -->
+
+  <!-- jQuery CDN — this gives us jQuery and AJAX power -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+  <!-- Google Fonts — for a clean, attractive look -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@700&display=swap" rel="stylesheet"/>
+
+  <style>
+    /* ── RESET & BASE ─────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Sans', sans-serif;
+      background: #0f172a;           /* dark navy background */
+      padding: 20px;
+    }
+
+    /* ── CARD WRAPPER ─────────────────────────── */
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+    }
+
+    /* ── HEADER ───────────────────────────────── */
+    .badge {
+      display: inline-block;
+      background: #0ea5e9;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 100px;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 26px;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 13.5px;
+      color: #94a3b8;
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    /* ── SEARCH BOX AREA ──────────────────────── */
+    .search-wrapper {
+      position: relative;       /* needed so dropdown positions correctly */
+    }
+
+    /* Search icon inside the input */
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      color: #64748b;
+      pointer-events: none;     /* icon doesn't block clicks */
+    }
+
+    /* THE SEARCH INPUT */
+    #searchInput {
+      width: 100%;
+      padding: 14px 16px 14px 44px;
+      font-size: 15px;
+      font-family: 'DM Sans', sans-serif;
+      background: #0f172a;
+      border: 2px solid #334155;
+      border-radius: 12px;
+      color: #f1f5f9;
+      outline: none;
+      transition: border-color 0.25s;
+    }
+
+    /* Highlight border when user clicks inside */
+    #searchInput:focus {
+      border-color: #0ea5e9;
+    }
+
+    /* ── SUGGESTIONS DROPDOWN ─────────────────── */
+    #suggestions {
+      position: absolute;       /* floats below the input */
+      top: calc(100% + 8px);   /* 8px gap below input */
+      left: 0;
+      right: 0;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      overflow: hidden;
+      z-index: 100;             /* always on top */
+      display: none;            /* hidden by default */
+      box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+    }
+
+    /* Each suggestion row */
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      color: #cbd5e1;
+      font-size: 14.5px;
+      cursor: pointer;
+      border-bottom: 1px solid #263148;
+      transition: background 0.15s;
+    }
+
+    .suggestion-item:last-child { border-bottom: none; }
+
+    /* Hover/highlight state */
+    .suggestion-item:hover,
+    .suggestion-item.active {
+      background: #0ea5e920;
+      color: #38bdf8;
+    }
+
+    /* Small icon before each item */
+    .suggestion-item .icon {
+      font-size: 16px;
+      opacity: 0.6;
+    }
+
+    /* ── NO RESULTS MESSAGE ───────────────────── */
+    .no-result {
+      padding: 14px 16px;
+      color: #64748b;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    /* ── STATUS / LOADING ─────────────────────── */
+    #status {
+      font-size: 12.5px;
+      color: #475569;
+      margin-top: 12px;
+      min-height: 18px;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── CODE EXPLAINER BOX ───────────────────── */
+    .explainer {
+      margin-top: 32px;
+      background: #0f172a;
+      border: 1px solid #1e3a5f;
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    .explainer h3 {
+      color: #38bdf8;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .explainer ol {
+      padding-left: 18px;
+      color: #94a3b8;
+      font-size: 13px;
+      line-height: 2;
+    }
+
+    .explainer ol li span {
+      color: #7dd3fc;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+
+  <!-- Header -->
+  <div class="badge">Web Technologies Assignment</div>
+  <h1>🔍 Smart Search</h1>
+  <p class="subtitle">
+    Type in the box below — suggestions appear instantly using
+    <strong style="color:#7dd3fc">AJAX + jQuery</strong>, just like Google!
+  </p>
+
+  <!-- Search box + dropdown -->
+  <div class="search-wrapper">
+
+    <span class="search-icon">🔎</span>
+
+    <!--
+      THE INPUT BOX
+      • id="searchInput" — lets jQuery find this element
+      • autocomplete="off" — stops browser's own suggestions
+    -->
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="e.g. concrete, bridge, soil..."
+      autocomplete="off"
+    />
+
+    <!--
+      THE DROPDOWN — filled dynamically by JavaScript
+    -->
+    <div id="suggestions"></div>
+
+  </div>
+
+  <!-- Live status text (shows "Searching...", "3 results found", etc.) -->
+  <div id="status"></div>
+
+  <!-- Simple explainer for the reader -->
+  <div class="explainer">
+    <h3>⚙️ How AJAX Works Here</h3>
+    <ol>
+      <li>User <span>types</span> → event fires every keystroke</li>
+      <li>jQuery sends an <span>AJAX request</span> with the typed text</li>
+      <li>Server (simulated) <span>filters & returns</span> matching data</li>
+      <li>jQuery <span>updates the DOM</span> — no page reload needed!</li>
+    </ol>
+  </div>
+
+</div>
+
+
+<script>
+  /*
+  ============================================================
+  AJAX SEARCH SUGGESTION — Main JavaScript
+  ============================================================
+  We use jQuery to:
+  1. Listen for keystrokes in the search box
+  2. Send an AJAX request (simulated here with a local function)
+  3. Display results as a dropdown list
+  ============================================================
+  */
+
+  // ── SIMULATED DATABASE ────────────────────────────────────
+  // In a real project, this data lives on a server.
+  // AJAX would call something like: fetch('/search?q=bridge')
+  // Here we simulate it with a JavaScript array.
+
+  const DATABASE = [
+    // Civil Engineering terms (relevant to you!)
+    "Concrete Mix Design",
+    "Concrete Grade M25",
+    "Bridge Construction Methods",
+    "Bridge Load Analysis",
+    "Soil Bearing Capacity",
+    "Soil Erosion Prevention",
+    "Steel Structure Design",
+    "Steel Reinforcement Bar",
+    "Foundation Types in Civil Engineering",
+    "Foundation Depth Calculation",
+    "Road Pavement Design",
+    "Road Survey Methods",
+    "Hydraulics and Fluid Mechanics",
+    "Hydraulic Jump Calculation",
+    "Surveying Instruments",
+    "Environmental Impact Assessment",
+    "Building Information Modeling (BIM)",
+    "Earthquake Resistant Design",
+    "Water Treatment Plant Design",
+    "Retaining Wall Design",
+  ];
+
+
+  // ── SIMULATED AJAX FUNCTION ───────────────────────────────
+  /*
+    This function MIMICS what a real AJAX call does:
+    → sends query to server → gets back matching results
+
+    In real life you'd write:
+    $.ajax({
+      url: "https://yourserver.com/search",
+      data: { q: query },
+      success: function(results) { ... }
+    });
+  */
+  function simulateAjaxRequest(query, callback) {
+
+    // Show "Searching..." while waiting (like a real server delay)
+    $("#status").text("⏳ Searching...");
+
+    // setTimeout simulates the small delay a real server response has
+    setTimeout(function () {
+
+      // Filter the database: keep items that include the typed text
+      // .toLowerCase() makes the search case-insensitive
+      const results = DATABASE.filter(function (item) {
+        return item.toLowerCase().includes(query.toLowerCase());
+      });
+
+      // Send results back to whoever called this function
+      callback(results);
+
+    }, 200); // 200ms delay — feels natural, like a real API
+
+  }
+
+
+  // ── DISPLAY SUGGESTIONS ───────────────────────────────────
+  function showSuggestions(results, query) {
+
+    const $box = $("#suggestions");  // the dropdown div
+    $box.empty();                    // clear old results
+
+    if (results.length === 0) {
+      // Nothing matched — show friendly message
+      $box.html('<div class="no-result">😕 No results found</div>');
+      $box.show();
+      $("#status").text("0 results found.");
+      return;
+    }
+
+    // Loop through each result and create a row
+    $.each(results, function (index, item) {
+
+      // Build one suggestion item using jQuery
+      const $item = $('<div class="suggestion-item"></div>');
+      $item.html('<span class="icon">📌</span> ' + item);
+
+      // When user clicks a suggestion → fill the input box
+      $item.on("click", function () {
+        $("#searchInput").val(item);   // put text into search box
+        $box.hide();                   // close dropdown
+        $("#status").text("✅ Selected: " + item);
+      });
+
+      $box.append($item);  // add row to dropdown
+    });
+
+    $box.show();  // make the dropdown visible
+    $("#status").text(results.length + " suggestion(s) found.");
+  }
+
+
+  // ── MAIN EVENT LISTENER ───────────────────────────────────
+  /*
+    jQuery's .on("input") fires every time the user
+    types, pastes, or deletes text in the input.
+  */
+  $("#searchInput").on("input", function () {
+
+    const query = $(this).val().trim();  // get current text, remove spaces
+
+    // If box is empty, hide dropdown and reset status
+    if (query.length === 0) {
+      $("#suggestions").hide();
+      $("#status").text("");
+      return;
+    }
+
+    // Only search if user typed at least 2 characters
+    if (query.length < 2) {
+      $("#status").text("Keep typing...");
+      return;
+    }
+
+    // 🚀 Fire the AJAX request!
+    simulateAjaxRequest(query, function (results) {
+      showSuggestions(results, query);
+    });
+
+  });
+
+
+  // ── KEYBOARD NAVIGATION ───────────────────────────────────
+  // Let user press ↑ ↓ to move through suggestions, Enter to pick
+
+  let activeIndex = -1;  // tracks which item is highlighted
+
+  $("#searchInput").on("keydown", function (e) {
+
+    const $items = $(".suggestion-item");
+    if (!$items.length) return;
+
+    if (e.key === "ArrowDown") {
+      // Move highlight down
+      activeIndex = Math.min(activeIndex + 1, $items.length - 1);
+    } else if (e.key === "ArrowUp") {
+      // Move highlight up
+      activeIndex = Math.max(activeIndex - 1, 0);
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      // Pick the highlighted item
+      $items.eq(activeIndex).trigger("click");
+      activeIndex = -1;
+      return;
+    } else if (e.key === "Escape") {
+      // Close dropdown
+      $("#suggestions").hide();
+      activeIndex = -1;
+      return;
+    }
+
+    // Update visual highlight
+    $items.removeClass("active");
+    $items.eq(activeIndex).addClass("active");
+
+  });
+
+
+  // ── CLOSE DROPDOWN ON OUTSIDE CLICK ──────────────────────
+  // If user clicks anywhere outside the search area, close dropdown
+  $(document).on("click", function (e) {
+    if (!$(e.target).closest(".search-wrapper").length) {
+      $("#suggestions").hide();
+    }
+  });
+
+</script>
+
+</body>
+</html>
